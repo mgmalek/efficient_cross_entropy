@@ -68,7 +68,7 @@ class FusedCrossEntropyLossFunction(torch.autograd.Function):
     # NOTE: We put the linear projection in the same autograd Function as the loss computation
     # because we overwrite the logits with their gradients inplace to avoid allocating more
     # memory for the gradients, and so we keep the logits completely contained within this
-    # Functionto avoid possible side-effects if they were exposed.
+    # Function to avoid possible side-effects if they were exposed.
 
     @staticmethod
     def forward(
