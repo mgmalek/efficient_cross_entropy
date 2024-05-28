@@ -28,22 +28,23 @@ def fwd_bwd(module: nn.Module, x: torch.Tensor, targ: torch.Tensor):
 @pytest.mark.parametrize("dim", [8, 2048])
 @pytest.mark.parametrize("n_loop_iters", [1, 2, 4])
 @pytest.mark.parametrize("reduction", ["sum", "mean"])
-@pytest.mark.parametrize("use_ignore_index", [False])
+@pytest.mark.parametrize("use_ignore_index", [True, False])
 @pytest.mark.parametrize("autocast", [True, False])
 @pytest.mark.parametrize("dtype", [torch.float32])
 @pytest.mark.parametrize("device", ["cuda"])
+@pytest.mark.parametrize("stddev", [1.0, 10.0])
 def test_correctness(
-    n_tokens, n_classes, dim, n_loop_iters, reduction, use_ignore_index, autocast, dtype, device
+    n_tokens, n_classes, dim, n_loop_iters, reduction, use_ignore_index, autocast, dtype, device, stddev
 ):
     torch.manual_seed(0)
 
-    x = torch.randn(n_tokens, dim, device=device, dtype=dtype)
+    x = stddev * torch.randn(n_tokens, dim, device=device, dtype=dtype)
     targ = torch.randint(low=0, high=n_classes, size=(n_tokens,), device=device)
 
     ignore_index = -1
     if use_ignore_index:
         targ = torch.where(
-            torch.rand(targ.shape, device=targ.device) < 0.1, targ, ignore_index
+            torch.rand(targ.shape, device=targ.device) < 0.5, targ, ignore_index
         )
 
     torch_module = PyTorchProjectionPlusCrossEntropyLoss(
