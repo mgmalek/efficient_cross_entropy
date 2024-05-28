@@ -17,6 +17,8 @@ from modules import (
 def _get_peak_memory_consumed(
     n_tokens, dim, n_classes, init_fn, dtype, device="cuda"
 ):
+    torch.cuda.synchronize()
+    torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
     initial_peak_mem_bytes = torch.cuda.max_memory_allocated(device=device)
 
@@ -27,6 +29,7 @@ def _get_peak_memory_consumed(
 
     _ = forward_fn(feat, targ).mean().backward()
 
+    torch.cuda.synchronize()
     final_peak_mem_bytes = torch.cuda.max_memory_allocated(device=device)
 
     peak_mem_consumed_bytes = final_peak_mem_bytes - initial_peak_mem_bytes
@@ -103,6 +106,24 @@ def run_test(
         mem_ax.plot(test_vals, peak_mems, "--o", label=line_label)
         time_ax.plot(test_vals, median_times, "--o", label=line_label)
 
+    test_vals = [0.0] + test_vals
+
+    for n in range(4):
+        peak_mems_theory = []
+        for test_val in test_vals:
+            params = {**test_constant_kwargs, test_key: test_val}
+            d = params["dim"]
+            V = params["n_classes"]
+            N = params["n_tokens"]
+            dtype = params["dtype"]
+            float_size =  {torch.float32: 4, torch.bfloat16: 2, torch.float16: 2}[dtype]
+
+            peak_mems_theory.append(float_size * (
+                2*N*d + 2*d*V + n*N*V # activations + weights + logits
+            ) / 1e9)
+
+        mem_ax.plot(test_vals, peak_mems_theory, "-", label=f'{float_size}*(2*N*D + 2*D*V + {n}*N*V)')
+
     for ax in (mem_ax, time_ax):
         ax.legend(loc="upper left")
 
@@ -149,7 +170,7 @@ def benchmark(line_configs, output_dir, debug):
 
     # Benchmark performance wrt dim
     test_key = "dim"
-    test_vals = [1024, 2048, 4096, 8192]
+    test_vals = [1024, 2048, 4096, 8192, 16384, 32768]
     test_constant_kwargs = dict(n_classes=32768, n_tokens=8192, dtype=torch.float32)
     df_dim = run_test(
         line_configs,
